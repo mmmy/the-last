@@ -1,1 +1,1 @@
-node strategy.js &
+node ~/workspace/REST-API-demos/REST-Nodejs-demo/strategy/strategy.js &

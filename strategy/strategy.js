@@ -69,9 +69,9 @@ function getKlines(currency, period, size) {
 }
 
 function run() {
-	const periodNum = 5
+	const periodNum = 15
 	const period = `${periodNum}min`
-	const size = 3
+	const size = 4
 	// 获取持仓
 	acount.getSymbols().then((balanceList) => {
 		// console.log(balanceList)
@@ -114,5 +114,5 @@ function run() {
 }
 setInterval(()=>{
 	run()
-},20000)
+}, 1000 * 60)
 
