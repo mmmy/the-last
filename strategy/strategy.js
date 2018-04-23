@@ -23,6 +23,7 @@ const logger = winston.createLogger({
 
 
 const BASE_URL = 'https://api.huobipro.com'
+const PERIOD = 60
 
 function logInfo(msg) {
 	console.log('++++++++++++++++++++++++++++++++++++')
@@ -69,7 +70,7 @@ function getKlines(currency, period, size) {
 }
 
 function run() {
-	const periodNum = 15
+	const periodNum = PERIOD
 	const period = `${periodNum}min`
 	const size = 4
 	// 获取持仓
@@ -114,5 +115,5 @@ function run() {
 }
 setInterval(()=>{
 	run()
-}, 1000 * 60)
+}, 1000 * 60 * PERIOD / 20)
 

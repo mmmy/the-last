@@ -68,12 +68,13 @@ var UTILS = {
 // 逃跑计划
 // 此策略可能会有错误的判断，导致提前出局（比如V字形反转），但是这个策略是安全的
 // 你永远不能预测未来的走势，我们只有概率
-function safe_category__escape_before_redjump(latestKlines, periodMins) {
+function safe_category__escape_before_redjump(latestKlines, periodMins, efficientRate) {
+	efficientRate = efficientRate || 1/3
 	var K0 = latestKlines[0]
 	var K1 = latestKlines[1]
 	var K2 = latestKlines[2]
 	var K3 = latestKlines[3]
-	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, 1/3)
+	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
 
 	var earnRate0 = UTILS.getEarnRate(K0)
 	var earnRate1 = UTILS.getEarnRate(K1)
@@ -92,4 +93,32 @@ function safe_category__escape_before_redjump(latestKlines, periodMins) {
 	return c1 || c2 || c3 || c4 ? 1 : 0
 }
 
+function safe_category__escape_before_redjump_eth(latestKlines, periodMins, efficientRate) {
+	efficientRate = efficientRate || 1/3
+	var K0 = latestKlines[0]
+	var K1 = latestKlines[1]
+	var K2 = latestKlines[2]
+	var K3 = latestKlines[3]
+	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
+
+	var earnRate0 = UTILS.getEarnRate(K0)
+	var earnRate1 = UTILS.getEarnRate(K1)
+	var earnRate2 = UTILS.getEarnRate(K2)
+	var volumeRate = K0.vol / K1.vol
+
+	// 下跌， 加速1.5倍下跌， 交易量放大两倍以上
+	var c1 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 1.5 && volumeRate > 2
+
+	var c2 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 3 && volumeRate > 1.5
+
+	var c3 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4 && volumeRate > 1.2
+
+	var c4 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4.6 && volumeRate > 1.05
+
+	var c5 = earnRate0 < -0.018  //一个小时下跌了1.8% 经验值
+
+	return (c1 || c2 || c3 || c4) && c5 ? 1 : 0
+}
+
 exports.safe_category__escape_before_redjump = safe_category__escape_before_redjump
+exports.safe_category__escape_before_redjump_eth = safe_category__escape_before_redjump_eth
