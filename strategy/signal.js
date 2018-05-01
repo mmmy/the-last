@@ -1,4 +1,4 @@
-
+var logger = require('./logger')
 /*
 Kline: {
 	id,      // id * 1000 得到当前unix时间
@@ -65,21 +65,41 @@ var UTILS = {
 	}
 }
 
+function getTrendData(latestKlines, periodMins, efficientRate=0.33) {
+	var K0 = latestKlines[0]
+	var K1 = latestKlines[1]
+	var K2 = latestKlines[2]
+	var K3 = latestKlines[3]
+	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
+	if (!K0Prediction) {
+		return false
+	}
+
+	var earnRate0 = UTILS.getEarnRate(K0Prediction)
+	var earnRate1 = UTILS.getEarnRate(K1)
+	var earnRate2 = UTILS.getEarnRate(K2)
+	var volumeRate = K0Prediction.vol / K1.vol
+
+	return {
+		K0,
+		K0Prediction,
+		earnRate0,
+		earnRate1,
+		earnRate2,
+		volumeRate
+	}
+}
+
 // 逃跑计划
 // 此策略可能会有错误的判断，导致提前出局（比如V字形反转），但是这个策略是安全的
 // 你永远不能预测未来的走势，我们只有概率
 function safe_category__escape_before_redjump(latestKlines, periodMins, efficientRate) {
-	efficientRate = efficientRate || 1/3
-	var K0 = latestKlines[0]
-	var K1 = latestKlines[1]
-	var K2 = latestKlines[2]
-	var K3 = latestKlines[3]
-	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
+	const trendData = getTrendData(latestKlines, periodMins, efficientRate)
+	if (!trendData) {
+		return 0
+	}
 
-	var earnRate0 = UTILS.getEarnRate(K0)
-	var earnRate1 = UTILS.getEarnRate(K1)
-	var earnRate2 = UTILS.getEarnRate(K2)
-	var volumeRate = K0.vol / K1.vol
+	const {K0, K0Prediction, earnRate0, earnRate1, earnRate2, volumeRate} = trendData
 
 	// 下跌， 加速1.5倍下跌， 交易量放大两倍以上
 	var c1 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 1.5 && volumeRate > 2
@@ -90,35 +110,89 @@ function safe_category__escape_before_redjump(latestKlines, periodMins, efficien
 
 	var c4 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4.6 && volumeRate > 1.05
 
-	return c1 || c2 || c3 || c4 ? 1 : 0
+	var c5 = earnRate0 < -0.048
+	// 下跌超过 12个点
+	var c6 = earnRate0 < -0.12
+
+	var sigl = (c1 || c2 || c3 || c4) && c5 || c6
+	if (sigl) {
+		logger.logInfo('normalizeKlineWidthPeriod')
+		logger.logInfo(JSON.stringify(K0))
+		logger.logInfo(JSON.stringify(K0Prediction))
+	}
+	return sigl ? 1 : 0
 }
 
-function safe_category__escape_before_redjump_eth(latestKlines, periodMins, efficientRate) {
-	efficientRate = efficientRate || 1/3
-	var K0 = latestKlines[0]
-	var K1 = latestKlines[1]
-	var K2 = latestKlines[2]
-	var K3 = latestKlines[3]
-	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
+// function safe_category__escape_before_redjump_eth(latestKlines, periodMins, efficientRate) {
+// 	efficientRate = efficientRate || 1/3
+// 	var K0 = latestKlines[0]
+// 	var K1 = latestKlines[1]
+// 	var K2 = latestKlines[2]
+// 	var K3 = latestKlines[3]
+// 	var K0Prediction = UTILS.normalizeKlineWidthPeriod(K0, periodMins, efficientRate)
 
-	var earnRate0 = UTILS.getEarnRate(K0)
-	var earnRate1 = UTILS.getEarnRate(K1)
-	var earnRate2 = UTILS.getEarnRate(K2)
-	var volumeRate = K0.vol / K1.vol
+// 	var earnRate0 = UTILS.getEarnRate(K0)
+// 	var earnRate1 = UTILS.getEarnRate(K1)
+// 	var earnRate2 = UTILS.getEarnRate(K2)
+// 	var volumeRate = K0.vol / K1.vol
 
-	// 下跌， 加速1.5倍下跌， 交易量放大两倍以上
-	var c1 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 1.5 && volumeRate > 2
+// 	// 下跌， 加速1.5倍下跌， 交易量放大两倍以上
+// 	var c1 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 1.5 && volumeRate > 2
 
-	var c2 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 3 && volumeRate > 1.5
+// 	var c2 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 3 && volumeRate > 1.5
 
-	var c3 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4 && volumeRate > 1.2
+// 	var c3 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4 && volumeRate > 1.2
 
-	var c4 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4.6 && volumeRate > 1.05
+// 	var c4 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 4.6 && volumeRate > 1.05
 
-	var c5 = earnRate0 < -0.018  //一个小时下跌了1.8% 经验值
+// 	var c5 = earnRate0 < -0.018  //一个小时下跌了1.8% 经验值
 
-	return (c1 || c2 || c3 || c4) && c5 ? 1 : 0
-}
+// 	return (c1 || c2 || c3 || c4) && c5 ? 1 : 0
+// }
 
 exports.safe_category__escape_before_redjump = safe_category__escape_before_redjump
-exports.safe_category__escape_before_redjump_eth = safe_category__escape_before_redjump_eth
+// exports.safe_category__escape_before_redjump_eth = safe_category__escape_before_redjump_eth
+
+exports.select_currency = function(latestKlines, periodMins, efficientRate) {
+	const trendData = getTrendData(latestKlines, periodMins, efficientRate)
+	if (!trendData) {
+		return 0
+	}
+
+	const {K0, K0Prediction, earnRate0, earnRate1, earnRate2, volumeRate} = trendData	
+
+	var c1 = earnRate0 > 0 && Math.abs(earnRate0 / earnRate1) > 3 && volumeRate > 4
+
+	var c2 = earnRate0 > 0.01 && volumeRate > 5
+
+	return c1 || c2 ? 1 : 0
+}
+// 短线操作 买
+exports.buy_signal_short = function(latestKlines, periodMins, efficientRate=0.33) {
+	const trendData = getTrendData(latestKlines, periodMins, efficientRate)
+	if (!trendData) {
+		return 0
+	}
+	const {K0, K0Prediction, earnRate0, earnRate1, earnRate2, volumeRate} = trendData	
+
+	var c1 = earnRate0 > 0.012
+	var c2 = earnRate0 > 0 && Math.abs(earnRate0 / earnRate1) > 2 && volumeRate > 1.2
+	// 前一根 跌了
+	var c3 = earnRate1 < -0.012 && volumeRate > 0.8
+
+	return (c1 && c2) || (c1 && c3) 
+}
+// 短线操作 卖
+exports.sell_signal_short = function(latestKlines, periodMins, efficientRate=0.33) {
+	const trendData = getTrendData(latestKlines, periodMins, efficientRate)
+	if (!trendData) {
+		return 0
+	}
+	const {K0, K0Prediction, earnRate0, earnRate1, earnRate2, volumeRate} = trendData	
+
+	var c1 = earnRate0 < -0.02
+	var c2 = earnRate0 < 0 && Math.abs(earnRate0 / earnRate1) > 2 && volumeRate > 1.1
+
+	var c3 = earnRate0 < -0.04
+	return c1 && c2 || c3
+}

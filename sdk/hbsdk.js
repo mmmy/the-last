@@ -134,6 +134,18 @@ var HUOBI_PRO = {
 
         return call_api('POST', path, payload, body);
     },
+    buy_market: function(symbol, amount) {
+        var path = '/v1/order/orders/place';
+        var body = get_body();
+        var payload = sign_sha('POST', URL_HUOBI_PRO, path, body);
+
+        body["account-id"] = config.huobi.account_id_pro;
+        body.type = "buy-market";
+        body.amount = amount;   // 比如 usdt 数量
+        body.symbol = symbol;
+
+        return call_api('POST', path, payload, body);
+    },
     sell_limit: function(symbol, amount, price) {
         var path = '/v1/order/orders/place';
         var body = get_body();

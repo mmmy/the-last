@@ -2,55 +2,29 @@
 const moment = require('moment');
 const http = require('../framework/httpClient');
 const Promise = require('bluebird');
-const winston = require('winston')
 const signal = require('./signal')
-
+const logger = require('./logger')
 const acount = require('./acount')
 
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.json(),
-  transports: [
-    //
-    // - Write to all logs with level `info` and below to `combined.log` 
-    // - Write all logs error (and below) to `error.log`.
-    //
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'info.log', level: 'info' }),
-    new winston.transports.File({ filename: 'all.log' })
-  ]
-})
+const notifyPhone = require('./notifyPhone')
 
 
 const BASE_URL = 'https://api.huobipro.com'
-const PERIOD = 60
+const PERIOD = 30
 
-function logInfo(msg) {
-	console.log('++++++++++++++++++++++++++++++++++++')
-	console.log('++++++++++++++++++++++++++++++++++++')
-	console.log('++++++++++++++++++++++++++++++++++++')
-	
-	console.log(msg)
-	console.log('++++++++++++++++++++++++++++++++++++')
-	console.log('++++++++++++++++++++++++++++++++++++')
-	console.log('++++++++++++++++++++++++++++++++++++')
-	
-  var now = new Date()
-	logger.log({
-		level: 'info',
-		time: +now,
-		msg: msg,
-	})
+function getFabiBalance(list, currency="usdt") {
+	if (!list) {
+		return 0
+	}
+	for (let i=0; i<list.length; i++) {
+		var item = list[i]
+		if (item.currency === currency) {
+			return item.balance
+		}
+	}
+	return 0
 }
-function logError(msg) {
-	console.error('================================')
-	console.log(msg)
-	logger.log({
-		level: 'error',
-		time: +new Date(),
-		msg: msg,
-	})
-}
+
 
 function getKlines(currency, period, size) {
 	const toCurrency = 'usdt'
@@ -77,28 +51,49 @@ function run() {
 	acount.getSymbols().then((balanceList) => {
 		// console.log(balanceList)
 		balanceList.forEach((balance, i) => {
+			if(balance.currency.toLowerCase() === 'usdt') {
+				console.log('usdt ................', balance)
+				return
+			}
 			// 获取k线
 			getKlines(balance.currency, period, size).then((json) => {
 				const klines = json.data
 				// 是否卖出
-				const sell = signal.safe_category__escape_before_redjump(klines, periodNum)
-				// console.log('#####################################', i+1)
-				// console.log(balance)
+				console.log('currency .................', balance.currency)
+				// let sell = signal.safe_category__escape_before_redjump(klines, periodNum)
+				let sell = signal.sell_signal_short(klines, periodNum)
+				
+				console.log('#####################################', i+1)
+				console.log(balance, klines && klines[0])
 				
 				if (sell) {
 					// acount.batchcancelCurrency
 					let amount = parseFloat(balance.balance)
-					amount = Math.floor(amount * 10000) / 10000  // 需要精确到4位
+					amount = Math.floor(amount * 10000) / 10000 - 1.2  // 需要精确到4位, eth,btc 四位
+					amount = amount.toFixed(4)
+					console.log(`~~~~~~~~~oooooooo~~~~~~~~~ amount :${amount}`)
 					acount.sellCurrency(balance.currency, amount).then(() => {
-						logInfo(`sold: ${JSON.stringify(balance)}`)
-					}).catch(e => logError(e))
+						notifyPhone.notifyPhone(`sold ${balance.currency} ${amount}`, 'cosmic')
+						logger.logInfo(`sold: ${JSON.stringify(balance)}, amount: ${amount}`)
+					}).catch(e => logger.logError(e))
+				}
+
+				let buy = signal.buy_signal_short(klines, periodNum)
+				let buyCurrency = balance.currency
+				if (buy) {
+					console.log('start buy ++++++++++++++++++++++++++++++++++++++++++++', i+1)
+					const amount = Math.floor(getFabiBalance(balanceList, 'usdt'))
+					acount.buyCurrency(buyCurrency, amount).then(() => {
+						notifyPhone.notifyPhone(`buy ${balance.currency} ${amount}`, 'bike')
+						logger.logInfo(`buy: ${JSON.stringify(balance)}, amount: ${amount}`)
+					}).catch(e => logger.logError(e))
 				}
 			}).catch((e) => {
-				logError(e)
+				logger.logError(e)
 			})
 		})
 	}).catch((e) => {
-		logError(e)
+		logger.logError(e)
 	})
 	// getKlines('eosusdt', period, size).then((json) => {
 	// 	const klines = json.data
@@ -106,11 +101,11 @@ function run() {
 	// 	console.log('should sell: ' , sell)
 	// 	if (sell) {
 	// 		// 卖出信号
-	// 		logInfo(`sell at: ${JSON.stringify(klines[0])}`)
+	// 		logger.logInfo(`sell at: ${JSON.stringify(klines[0])}`)
 	// 	}
-	// 	// logInfo(json)
+	// 	// logger.logInfo(json)
 	// }).catch((e)=>{
-	// 	logError(e)
+	// 	logger.logError(e)
 	// })
 }
 setInterval(()=>{

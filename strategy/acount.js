@@ -16,8 +16,9 @@ exports.getSymbols = function() {
                 console.log('?????????????????????????????????')
                 reject('getSymbols empty')
             } else {
-                let symbols = json.list.filter(item => Math.floor(parseFloat(item.balance) * 10000) > 0)
-                symbols = symbols.filter(item => item.currency.toLowerCase() !== 'usdt')
+                // 选出持币数量大于0.01个
+                let symbols = json.list.filter(item => Math.floor(parseFloat(item.balance) * 100) > 0)
+                // symbols = symbols.filter(item => item.currency.toLowerCase() !== 'usdt')
                 // symbols = symbols.filter(item => ['eos'].indexOf(item.currency.toLowerCase()) === -1) // 先不能拿eos 做实验
                 symbols = symbols.filter(item => item.type === 'trade')            // 过滤能交易的, 因为还有frozen
                 resolve(symbols)
@@ -50,4 +51,9 @@ exports.batchcancelCurrency = function(currency) {
 exports.sellCurrency = function(currency, amount) {
     const symbol = `${currency}${toCurrency}`
     return hbsdk.sell_market(symbol, amount)
+}
+// buy
+exports.buyCurrency = function(currency, amount) {
+    const symbol = `${currency}${toCurrency}`
+    return hbsdk.buy_market(symbol, amount)
 }
